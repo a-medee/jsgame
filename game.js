@@ -1,6 +1,6 @@
 const radius = 69;
 const speed = 1000;
-const BULLET_SPEDD = 50;
+const BULLET_SPEDD = 2000;
 const bullet_radius = 40;
 
 
@@ -177,7 +177,7 @@ class Game
 
     mouseDown(event)
     {
-	const mousePos =  new Ball(event.screenX, event.screenY);
+	const mousePos =  new Ball(event.offsetX, event.offsetY);
 	const bulletVet = mousePos.sub(this.pos).normalise().scale(BULLET_SPEDD);
 	console.log(BULLET_SPEDD)
 	this.bullets.add(new Bullet(this.pos, bulletVet));
