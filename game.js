@@ -2,6 +2,7 @@ const radius = 69;
 const speed = 1000;
 const BULLET_SPEDD = 2000;
 const bullet_radius = 40;
+const bullet_lifetime = 0.5;
 
 
 class Bullet
@@ -10,11 +11,13 @@ class Bullet
     {
 	this.pos = pos;
 	this.vel = vel;
+	this.bullet_lifetime = bullet_lifetime;
     }
 
     update(dt)
     {
 	this.pos = this.pos.add(this.vel.scale(dt));
+	this.bullet_lifetime -= dt;
     }
 
     render(context)
@@ -60,11 +63,21 @@ class Ball {
 
 }
 const directionsMap = {
-	"KeyO": new Ball(0, 1.0),
-	"KeyP": new Ball(0, -1.0),
-	"KeyB": new Ball(-1.0, 0),
-	"KeyD": new Ball(1.0, 0)
+    "KeyO": new Ball(0, 1.0),
+    "KeyP": new Ball(0, -1.0),
+    "KeyB": new Ball(-1.0, 0),
+    "KeyD": new Ball(1.0, 0)
 }
+
+const TutorialState = Object.freeze({
+    "LearningMovement": 0,
+    "LearningShooting": 1,
+    "Finished": 2,
+});
+
+const TutorialMessages = Object.freeze([
+    "OPDB to move", "Click to shoot circles", ""
+]);
 
 class TutorialPopup
 {
@@ -73,6 +86,8 @@ class TutorialPopup
 	this.alpha = 0.0;
 	this.dalpha = 0.0;
 	this.text = text;
+	this.onFadedIn = undefined;
+	this.onFadedOut = undefined;
     }
 
     update(dt)
@@ -83,11 +98,21 @@ class TutorialPopup
 	{
 	    this.alpha = 0.0;
 	    this.dalpha = 0.0;
+
+	    if (this.onFadedOut !== undefined)
+	    {
+		this.onFadedOut();
+	    }
 	} else if (this.dalpha > 0.0 && this.alpha >= 1.0) {
 	    this.dalpha = 0.0;
 	    this.alpha = 1.0;
-	}
 
+	    if (this.onFadedIn !== undefined)
+	    {
+		this.onFadedIn();
+	    }
+	}
+	
     }
 
     render(context)
@@ -95,6 +120,7 @@ class TutorialPopup
 	const widht = window.innerWidth;
 	const height = window.innerHeight;
 
+	console.log(this.alpha);
 	context.fillStyle = `rgba(255, 255, 0, ${this.alpha})`;
 	context.font = "77px serif";
 	context.textAlign = "center"
@@ -105,13 +131,53 @@ class TutorialPopup
     fadeIn()
     {
 	this.dalpha = 1.0;
-	this.alpha = 0.0;
     }
 
     fadeOut()
     {
 	this.dalpha = -1.0;
-	this.alpha = 1.0;
+    }
+}
+
+class Tutorial
+{
+    constructor()
+    {
+	this.state = 0;
+	this.popup = new TutorialPopup(TutorialMessages[this.state]);
+	this.popup.fadeIn();
+	this.popup.onFadedOut = () => {
+	    this.popup.text = TutorialMessages[this.state];
+	    this.popup.fadeIn();
+	}
+    }
+
+    update(dt)
+    {
+	this.popup.update(dt);
+    }
+
+    render(context)
+    {
+	this.popup.render(context);
+    }
+
+    playerMoved()
+    {
+	if (this.state == TutorialState.LearningMovement)
+	{
+	    this.popup.fadeOut();
+	    this.state += 1;
+	}
+    }
+
+    playerShot()
+    {
+	if (this.state == TutorialState.LearningShooting)
+	{
+	    this.popup.fadeOut();
+	    this.state += 1;
+	}
     }
 }
 
@@ -120,28 +186,30 @@ class Game
     constructor()
     {
 	this.pos = new Ball(radius + 10, radius + 10);
-	this.popup = new TutorialPopup("Text for the js");
+	this.tutorial = new Tutorial();
 	this.vel = new Ball(0, 0);
-	this.popup.fadeIn();
 	this.player_moved_text = false;
 	this.mousePos = new Ball(0, 0);
-	this.bullets = new Set();
+	this.bullets = [];
+	this.moved = false;
     }
 
     update(dt)
     {
 	this.pos = this.pos.add(this.vel.scale(dt));
-	this.popup.update(dt);
-	if (!this.player_moved_text && this.vel.length() > 0)
-	{
-	    this.player_moved_text = true;
-	    this.popup.fadeOut();
-	}
+	this.tutorial.update(dt);
 
+	if (this.moved)
+	{
+	    this.tutorial.playerMoved();
+	}
 	for (let bullet of this.bullets)
 	{
 	    bullet.update(dt);
 	}
+
+	this.bullets = this.bullets.filter((bullet) => bullet.bullet_lifetime > 0.0);
+		
     }
 
     render(context)
@@ -150,7 +218,7 @@ class Game
 	const height = (canvas.height = window.innerHeight);
 
 	context.clearRect(0, 0, widht, height);
-	this.popup.render(context)
+	this.tutorial.render(context)
 	for (let bullet of this.bullets)
 	{
 	    bullet.render(context);
@@ -163,6 +231,7 @@ class Game
     {
 	if (event.code in directionsMap)
 	{
+	    this.moved = true;
 	    this.vel = this.vel.add(directionsMap[event.code].scale(speed));
 	}
     }
@@ -171,16 +240,17 @@ class Game
     {
 	if (event.code in directionsMap)
 	{
+	    this.moved = true;
 	    this.vel = this.vel.sub(directionsMap[event.code].scale(speed));
 	}
     }
 
     mouseDown(event)
     {
+	this.tutorial.playerShot();
 	const mousePos =  new Ball(event.offsetX, event.offsetY);
 	const bulletVet = mousePos.sub(this.pos).normalise().scale(BULLET_SPEDD);
-	console.log(BULLET_SPEDD)
-	this.bullets.add(new Bullet(this.pos, bulletVet));
+	this.bullets.push(new Bullet(this.pos, bulletVet));
     }
 }
 function fillCircle(context, pos, radius, color = "green")
