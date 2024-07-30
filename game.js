@@ -3,7 +3,30 @@ const speed = 1000;
 const BULLET_SPEDD = 2000;
 const bullet_radius = 40;
 const bullet_lifetime = 0.5;
+const Enemy_Radius = radius;
+const Enemy_Color = "#000000";
+const Enemy_Speed = 500 / 3;
 
+class Enemy
+{
+    constructor(pos)
+    {
+	this.pos = pos;
+	this.dead = false;
+    }
+
+    update(dt, playerPos)
+    {
+	let vel = playerPos.sub(this.pos)
+	    .normalise().scale(Enemy_Speed * dt);
+	this.pos = this.pos.add(vel);
+    }
+
+    render(context)
+    {
+	fillCircle(context, this.pos, Enemy_Radius, Enemy_Color);
+    }
+}
 
 class Bullet
 {
@@ -51,13 +74,12 @@ class Ball {
 
     length()
     {
-	return Math.sqrt(this.x * this.x + this.y + this.y);
+	return Math.sqrt(this.x * this.x + this.y * this.y);
     }
 
     normalise()
     {
 	const sire = this.length();
-
 	return new Ball(this.x / sire, this.y / sire);
     }
 
@@ -112,7 +134,7 @@ class TutorialPopup
 		this.onFadedIn();
 	    }
 	}
-	
+
     }
 
     render(context)
@@ -191,7 +213,10 @@ class Game
 	this.player_moved_text = false;
 	this.mousePos = new Ball(0, 0);
 	this.bullets = [];
+	this.ennemies = [];
 	this.moved = false;
+
+	this.ennemies.push(new Enemy(new Ball(800, 600)))
     }
 
     update(dt)
@@ -208,8 +233,14 @@ class Game
 	    bullet.update(dt);
 	}
 
+	for (let ennemy of this.ennemies)
+	{
+	    ennemy.update(dt, this.pos);
+	}
+
+
 	this.bullets = this.bullets.filter((bullet) => bullet.bullet_lifetime > 0.0);
-		
+
     }
 
     render(context)
@@ -224,6 +255,11 @@ class Game
 	    bullet.render(context);
 	}
 
+	for (let ennemy of this.ennemies)
+	{
+	    ennemy.render(context);
+	}
+	
 	fillCircle(context, this.pos, radius, "red");
     }
 
@@ -231,6 +267,7 @@ class Game
     {
 	if (event.code in directionsMap)
 	{
+	    //this.vel = new Ball(0, 0); add this if ball runs to fast
 	    this.moved = true;
 	    this.vel = this.vel.add(directionsMap[event.code].scale(speed));
 	}
@@ -265,11 +302,11 @@ function fillCircle(context, pos, radius, color = "green")
     const canvas = document.getElementById("canvas");
     const context = canvas.getContext("2d");
     const game = new Game();
-   
+
     let start;
 
     let dt;
-    
+
     function step(timestamp)
     {
 	if (start === undefined)
