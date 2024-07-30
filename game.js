@@ -4,7 +4,7 @@ const BULLET_SPEDD = 2000;
 const bullet_radius = 40;
 const bullet_lifetime = 0.5;
 const Enemy_Radius = radius;
-const Enemy_Color = "#000000";
+const Enemy_Color = "#0000ff";
 const Enemy_Speed = 500 / 3;
 
 class Enemy
@@ -72,17 +72,21 @@ class Ball {
 	return new Ball(this.x * ball, this.y * ball);
     }
 
-    length()
+    len()
     {
 	return Math.sqrt(this.x * this.x + this.y * this.y);
     }
 
     normalise()
     {
-	const sire = this.length();
+	const sire = this.len();
 	return new Ball(this.x / sire, this.y / sire);
     }
 
+    dist(that)
+    {
+	return this.sub(that).len();
+    }
 }
 const directionsMap = {
     "KeyO": new Ball(0, 1.0),
@@ -216,7 +220,7 @@ class Game
 	this.ennemies = [];
 	this.moved = false;
 
-	this.ennemies.push(new Enemy(new Ball(800, 600)))
+	this.ennemies.push(new Enemy(new Ball(800, 400)));
     }
 
     update(dt)
@@ -224,6 +228,17 @@ class Game
 	this.pos = this.pos.add(this.vel.scale(dt));
 	this.tutorial.update(dt);
 
+	for (let ennemy of this.ennemies)
+	{
+	    for (let bullet of this.bullets)
+	    {
+		if (ennemy.pos.dist(bullet.pos) <= Enemy_Radius + radius)
+		{
+		    ennemy.dead = true;
+		    bullet.bullet_lifetime = 0.0;
+		}
+	    }
+	}
 	if (this.moved)
 	{
 	    this.tutorial.playerMoved();
@@ -238,9 +253,8 @@ class Game
 	    ennemy.update(dt, this.pos);
 	}
 
-
 	this.bullets = this.bullets.filter((bullet) => bullet.bullet_lifetime > 0.0);
-
+	this.ennemies = this.ennemies.filter((enemy) => !enemy.dead);
     }
 
     render(context)
