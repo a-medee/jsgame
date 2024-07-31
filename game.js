@@ -6,6 +6,52 @@ const bullet_lifetime = 0.5;
 const Enemy_Radius = radius;
 const Enemy_Color = "#0000ff";
 const Enemy_Speed = 500 / 3;
+const PARTICLE_COUNT = 100;
+const PARTICLE_MAG = BULLET_SPEDD;
+const PARTICLE_RADIUS = 10;
+const PARTICLE_LIFETIME = 0.5;
+const PARTICLE_COLOR = "#27408b";
+const ENEMY_SPAWN_COOLDOWN = 1.0;
+const ENEMY_SPAWN_DISTANCE = 1500.0;
+
+class Particle
+{
+   constructor(pos, vel, lifetime, rdius)
+    {
+	this.pos = pos;
+	this.vel = vel;
+	this.lifetime = lifetime;
+	this.rdius = rdius;
+    }
+
+    update (dt)
+    {
+	this.pos = this.pos.add(this.vel.scale(dt));
+	this.lifetime -= dt; 
+    }
+    render (context)
+    {
+	fillCircle(context, this.pos, this.rdius, PARTICLE_COLOR);
+
+    }
+}
+
+
+function polarBall(mag, dir)
+{
+    return new Ball(Math.cos(dir) * mag, Math.sin(dir) * mag);
+}
+
+function particul_burst(particles, center)
+{
+    for(let i = 0; i < PARTICLE_COUNT; ++i)
+    {
+	particles.push(new Particle(center,
+				    polarBall(Math.random() * PARTICLE_MAG, Math.random() * 2 * Math.PI),
+				    Math.random() * PARTICLE_LIFETIME,
+				    Math.random() * PARTICLE_RADIUS));
+    }
+}
 
 class Enemy
 {
@@ -146,7 +192,6 @@ class TutorialPopup
 	const widht = window.innerWidth;
 	const height = window.innerHeight;
 
-	console.log(this.alpha);
 	context.fillStyle = `rgba(255, 255, 0, ${this.alpha})`;
 	context.font = "77px serif";
 	context.textAlign = "center"
@@ -207,6 +252,14 @@ class Tutorial
     }
 }
 
+
+function renderEntity(entities, context)
+{
+    for (let entity of entities)
+    {
+	entity.render(context)
+    }
+}
 class Game
 {
     constructor()
@@ -218,9 +271,10 @@ class Game
 	this.mousePos = new Ball(0, 0);
 	this.bullets = [];
 	this.ennemies = [];
+	this.particles = [];
 	this.moved = false;
-
-	this.ennemies.push(new Enemy(new Ball(800, 400)));
+	this.enemySpawnRate = ENEMY_SPAWN_COOLDOWN;
+	this.enemySpawnCooldown = this.enemySpawnRate;
     }
 
     update(dt)
@@ -232,10 +286,11 @@ class Game
 	{
 	    for (let bullet of this.bullets)
 	    {
-		if (ennemy.pos.dist(bullet.pos) <= Enemy_Radius + radius)
+		if (!ennemy.dead && ennemy.pos.dist(bullet.pos) <= Enemy_Radius + radius)
 		{
 		    ennemy.dead = true;
 		    bullet.bullet_lifetime = 0.0;
+		    particul_burst(this.particles, ennemy.pos);
 		}
 	    }
 	}
@@ -253,8 +308,24 @@ class Game
 	    ennemy.update(dt, this.pos);
 	}
 
+	for (let particle of this.particles)
+	{
+	    particle.update(dt);
+	}
 	this.bullets = this.bullets.filter((bullet) => bullet.bullet_lifetime > 0.0);
 	this.ennemies = this.ennemies.filter((enemy) => !enemy.dead);
+	this.particles = this.particles.filter((particle) => particle.lifetime > 0.0)
+
+	if (this.tutorial.state == TutorialState.Finished)
+	{
+	    this.enemySpawnCooldown -= dt;
+	    if (this.enemySpawnCooldown <= 0.0)
+	    {
+		this.spawnEnemy();
+		this.enemySpawnCooldown = this.enemySpawnRate;
+		this.enemySpawnRate = Math.max(0.01, this.enemySpawnRate - 0.01);
+	    }
+	}
     }
 
     render(context)
@@ -263,20 +334,20 @@ class Game
 	const height = (canvas.height = window.innerHeight);
 
 	context.clearRect(0, 0, widht, height);
-	this.tutorial.render(context)
-	for (let bullet of this.bullets)
-	{
-	    bullet.render(context);
-	}
+	this.tutorial.render(context);
 
-	for (let ennemy of this.ennemies)
-	{
-	    ennemy.render(context);
-	}
+	renderEntity(this.bullets, context);
+	renderEntity(this.ennemies, context);
+	renderEntity(this.particles, context);
 	
 	fillCircle(context, this.pos, radius, "red");
     }
 
+    spawnEnemy()
+    {
+	let dir = Math.random() * 2 * Math.PI;
+	this.ennemies.push(new Enemy(this.pos.add(polarBall(ENEMY_SPAWN_DISTANCE, dir))));
+    }
     keyDown(event)
     {
 	if (event.code in directionsMap)
